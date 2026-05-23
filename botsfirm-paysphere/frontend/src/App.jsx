@@ -9,7 +9,8 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import EmployeeSetPasswordPage from './pages/auth/EmployeeSetPasswordPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
-
+import SuperAdminLayout from './pages/super-admin/SuperAdminLayout';
+import DashboardPage from './pages/super-admin/DashboardPage';
 function ComingSoon({ title }) {
   return (
     <div
@@ -113,13 +114,15 @@ function AppRoutes() {
       />
 
       <Route
-        path="/super-admin/*"
-        element={
-          <ProtectedRoute roles={['super_admin']}>
-            <ComingSoon title="Super Admin" />
-          </ProtectedRoute>
-        }
-      />
+  path="/super-admin"
+  element={
+    <ProtectedRoute roles={['super_admin']}>
+      <SuperAdminLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<DashboardPage />} />
+</Route>
       <Route
         path="/client/*"
         element={
