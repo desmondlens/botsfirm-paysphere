@@ -1,6 +1,12 @@
 // reports.routes.js
 // Mounts report endpoints under /api/reports.
-// Endpoints: BURS ITW-7 (monthly), ITW-10 (annual), ITW-8 (per employee),
-// payroll register Excel, QuickBooks journal export.
-// All BURS endpoints are locked while the tenant is on a trial.
-// To be implemented.
+// To be implemented in a later phase. Stub router so the server can boot.
+
+const express = require('express');
+const router = express.Router();
+
+router.use((req, res) => {
+  res.status(501).json({ error: 'Reports endpoints not yet implemented' });
+});
+
+module.exports = router;

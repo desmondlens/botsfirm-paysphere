@@ -1,4 +1,12 @@
 // client.routes.js
 // Mounts Client (tenant owner) endpoints under /api/client.
-// Endpoints: admins management, final leave approvals, tenant reports, settings.
-// To be implemented.
+// To be implemented in a later phase. Stub router so the server can boot.
+
+const express = require('express');
+const router = express.Router();
+
+router.use((req, res) => {
+  res.status(501).json({ error: 'Client endpoints not yet implemented' });
+});
+
+module.exports = router;

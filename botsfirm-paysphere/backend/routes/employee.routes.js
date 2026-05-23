@@ -1,4 +1,12 @@
 // employee.routes.js
-// Mounts Employee self-service endpoints under /api/employee.
-// Endpoints: own profile, own payslips, own leave requests and balances.
-// To be implemented.
+// Mounts Employee endpoints under /api/employee.
+// To be implemented in a later phase. Stub router so the server can boot.
+
+const express = require('express');
+const router = express.Router();
+
+router.use((req, res) => {
+  res.status(501).json({ error: 'Employee endpoints not yet implemented' });
+});
+
+module.exports = router;
