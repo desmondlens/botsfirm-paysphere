@@ -11,6 +11,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import SuperAdminLayout from './pages/super-admin/SuperAdminLayout';
 import DashboardPage from './pages/super-admin/DashboardPage';
+import ClientsPage from './pages/super-admin/ClientsPage';
+
 function ComingSoon({ title }) {
   return (
     <div
@@ -122,6 +124,7 @@ function AppRoutes() {
   }
 >
   <Route path="dashboard" element={<DashboardPage />} />
+<Route path="clients" element={<ClientsPage />} />
 </Route>
       <Route
         path="/client/*"
@@ -131,6 +134,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      
+      
       <Route
         path="/admin/*"
         element={
