@@ -17,7 +17,7 @@ const payrollRoutes = require('./routes/payroll.routes');
 const leaveRoutes = require('./routes/leave.routes');
 const reportsRoutes = require('./routes/reports.routes');
 
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT || '3002', 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const CORS_ALLOWED_ORIGINS = (
   process.env.CORS_ALLOWED_ORIGINS || FRONTEND_URL
