@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Build output
+build/
+dist/
+out/
+.next/
+.vercel/
+.netlify/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage / testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Misc
+*.tsbuildinfo
+.eslintcache
+.cache/
+.parcel-cache/
+
+# Generated payslips / exports (never commit tenant data)
+backend/generated/
+backend/exports/
+backend/tmp/
+*.pdf
+*.xlsx
+!shared/templates/*.pdf
+!shared/templates/*.xlsx
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
