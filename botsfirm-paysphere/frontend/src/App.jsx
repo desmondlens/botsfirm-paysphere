@@ -16,7 +16,11 @@ import InviteCodesPage from './pages/super-admin/InviteCodesPage';
 import TrialsPage from './pages/super-admin/TrialsPage';
 import AuditLogsPage from './pages/super-admin/AuditLogsPage';
 import SettingsPage from './pages/super-admin/SettingsPage';
-
+import ClientLayout from './pages/client/ClientLayout';
+import ClientDashboardPage from './pages/client/ClientDashboardPage';
+import LeaveApprovalsPage from './pages/client/LeaveApprovalsPage';
+import AdminsPage from './pages/client/AdminsPage';
+import ClientSettingsPage from './pages/client/ClientSettingsPage';
 
 function ComingSoon({ title }) {
   return (
@@ -138,13 +142,20 @@ function AppRoutes() {
 
 </Route>     
       <Route
-        path="/client/*"
-        element={
-          <ProtectedRoute roles={['client']}>
-            <ComingSoon title="Client Portal" />
-          </ProtectedRoute>
-        }
-      />
+  path="/client"
+  element={
+    <ProtectedRoute roles={['client']}>
+      <ClientLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<ClientDashboardPage />} />
+  <Route path="leave-approvals" element={<LeaveApprovalsPage />} />
+  <Route path="admins" element={<AdminsPage />} />
+  <Route path="settings" element={<ClientSettingsPage />} />
+
+
+</Route>
 
       
       
