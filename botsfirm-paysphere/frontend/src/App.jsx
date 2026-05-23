@@ -12,6 +12,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import SuperAdminLayout from './pages/super-admin/SuperAdminLayout';
 import DashboardPage from './pages/super-admin/DashboardPage';
 import ClientsPage from './pages/super-admin/ClientsPage';
+import InviteCodesPage from './pages/super-admin/InviteCodesPage';
+import TrialsPage from './pages/super-admin/TrialsPage';
+import AuditLogsPage from './pages/super-admin/AuditLogsPage';
+import SettingsPage from './pages/super-admin/SettingsPage';
+
 
 function ComingSoon({ title }) {
   return (
@@ -124,8 +129,14 @@ function AppRoutes() {
   }
 >
   <Route path="dashboard" element={<DashboardPage />} />
-<Route path="clients" element={<ClientsPage />} />
-</Route>
+  <Route path="clients" element={<ClientsPage />} />
+  <Route path="trials" element={<TrialsPage />} />
+  <Route path="invite-codes" element={<InviteCodesPage />} />
+  <Route path="audit-logs" element={<AuditLogsPage />} />
+  <Route path="settings" element={<SettingsPage />} />
+
+
+</Route>     
       <Route
         path="/client/*"
         element={
