@@ -68,22 +68,22 @@
  * @type {{ floor: number, ceiling: number, rate: number, baseTax: number }[]}
  */
 const RESIDENT_BRACKETS = [
-    { floor: 0,        ceiling: 48000,             rate: 0,      baseTax: 0      },
-    { floor: 48000,    ceiling: 84000,             rate: 0.05,   baseTax: 0      },
-    { floor: 84000,    ceiling: 120000,            rate: 0.125,  baseTax: 1800   },
-    { floor: 120000,   ceiling: 156000,            rate: 0.1875, baseTax: 6300   },
-    { floor: 156000,   ceiling: Number.POSITIVE_INFINITY, rate: 0.25,   baseTax: 13050 }
-];
+    { min: 0, max: 48000, base: 0, rate: 0 },
+      { min: 48000, max: 84000, base: 0, rate: 0.05 },
+      { min: 84000, max: 120000, base: 1800, rate: 0.125 },
+      { min: 120000, max: 156000, base: 6300, rate: 0.1875 },
+      { min: 156000, max: Infinity, base: 13050, rate: 0.25 },
+    ],
 
 /**
  * Annual PAYE brackets for non-residents.
  * @type {{ floor: number, ceiling: number, rate: number, baseTax: number }[]}
  */
 const NON_RESIDENT_BRACKETS = [
-    { floor: 0,        ceiling: 84000,             rate: 0.05,   baseTax: 0      },
-    { floor: 84000,    ceiling: 120000,            rate: 0.125,  baseTax: 4200   },
-    { floor: 120000,   ceiling: 156000,            rate: 0.1875, baseTax: 8700   },
-    { floor: 156000,   ceiling: Number.POSITIVE_INFINITY, rate: 0.25,   baseTax: 15450 }
+    { min: 0, max: 84000, base: 0, rate: 0.05 },
+      { min: 84000, max: 120000, base: 4200, rate: 0.125 },
+      { min: 120000, max: 156000, base: 8700, rate: 0.1875 },
+      { min: 156000, max: Infinity, base: 15450, rate: 0.25 },
 ];
 
 /** Minimum wage in BWP per hour, effective January 2026. */

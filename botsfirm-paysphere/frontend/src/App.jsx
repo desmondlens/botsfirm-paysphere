@@ -23,6 +23,15 @@ import AdminsPage from './pages/client/AdminsPage';
 import ClientSettingsPage from './pages/client/ClientSettingsPage';
 import PayrollOverviewPage from './pages/client/PayrollOverviewPage';
 import CompliancePage from './pages/client/CompliancePage';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import EmployeesPage from './pages/admin/EmployeesPage';
+import PayrollPage from './pages/admin/PayrollPage';
+import LeavePage from './pages/admin/LeavePage';
+import AllowancesPage from './pages/admin/AllowancesPage';
+import DeductionsPage from './pages/admin/DeductionsPage';
+import ReportsPage from './pages/admin/ReportsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 
 
 function ComingSoon({ title }) {
@@ -163,13 +172,22 @@ function AppRoutes() {
       
       
       <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute roles={['admin']}>
-            <ComingSoon title="Admin Portal" />
-          </ProtectedRoute>
-        }
-      />
+  path="/admin"
+  element={
+    <ProtectedRoute roles={['admin']}>
+      <AdminLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<AdminDashboardPage />} />
+  <Route path="employees" element={<EmployeesPage />} />
+  <Route path="payroll" element={<PayrollPage />} />
+  <Route path="leave" element={<LeavePage />} />
+  <Route path="allowances" element={<AllowancesPage />} />
+  <Route path="deductions" element={<DeductionsPage />} />
+  <Route path="reports" element={<ReportsPage />} />
+  <Route path="settings" element={<AdminSettingsPage />} />
+</Route>
       <Route
         path="/employee/*"
         element={
