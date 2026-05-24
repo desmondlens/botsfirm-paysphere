@@ -21,6 +21,9 @@ import ClientDashboardPage from './pages/client/ClientDashboardPage';
 import LeaveApprovalsPage from './pages/client/LeaveApprovalsPage';
 import AdminsPage from './pages/client/AdminsPage';
 import ClientSettingsPage from './pages/client/ClientSettingsPage';
+import PayrollOverviewPage from './pages/client/PayrollOverviewPage';
+import CompliancePage from './pages/client/CompliancePage';
+
 
 function ComingSoon({ title }) {
   return (
@@ -153,8 +156,8 @@ function AppRoutes() {
   <Route path="leave-approvals" element={<LeaveApprovalsPage />} />
   <Route path="admins" element={<AdminsPage />} />
   <Route path="settings" element={<ClientSettingsPage />} />
-
-
+  <Route path="payroll" element={<PayrollOverviewPage />} />
+  <Route path="compliance" element={<CompliancePage />} />
 </Route>
 
       
