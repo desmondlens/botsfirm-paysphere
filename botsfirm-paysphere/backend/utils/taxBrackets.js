@@ -1,303 +1,277 @@
 /**
- * @file taxBrackets.js
- * @module backend/utils/taxBrackets
+ * Botsfirm PaySphere — PAYE Tax Engine
+ * ==============================================
+ * SINGLE SOURCE OF TRUTH for all PAYE calculations.
+ * Source: BURS / PwC Tax Summaries (January 2026)
+ * Tax year: 2025/2026 (July 2025 — June 2026)
  *
- * Botswana PAYE tax calculation engine.
+ * ARCHITECTURE DECISION:
+ * Option B selected — explicit cumulative bracket iteration.
+ * No base values. Rates only. Self-validating by construction.
+ * Rationale: eliminates hidden dependency between rate and base values.
+ * Any rate update is a single-field change. No derived values to maintain.
  *
- * Source: Botswana Unified Revenue Service (BURS) PAYE schedule
- * as published in the PwC Tax Summaries — Botswana page (last
- * reviewed January 2026). Brackets below are stated in annual BWP.
- *
- * Method
- * ------
- * Botswana PAYE is computed on an annualised basis. To produce a
- * monthly PAYE figure we:
- *   1. Annualise the monthly taxable income (× 12).
- *   2. Apply the appropriate annual bracket table (resident vs non-resident).
- *   3. Divide the annual tax by 12 to recover the monthly PAYE.
- *
- * Residents / citizens enjoy a BWP 48,000 tax-free threshold.
- * Non-residents do not — they are taxed from the first pula at 5%.
- *
- * Annual brackets — RESIDENTS / CITIZENS
- * ---------------------------------------
- *   BWP        0   –    48,000   : 0% (tax free)
- *   BWP   48,001   –    84,000   : 5% on excess over 48,000
- *   BWP   84,001   –   120,000   : 1,800 + 12.5%  on excess over 84,000
- *   BWP  120,001   –   156,000   : 6,300 + 18.75% on excess over 120,000
- *   BWP  156,001   –   ∞         : 13,050 + 25%   on excess over 156,000
- *
- * Annual brackets — NON-RESIDENTS
- * --------------------------------
- *   BWP        0   –    84,000   : 5%   on all income (no tax-free band)
- *   BWP   84,001   –   120,000   : 4,200  + 12.5%  on excess over 84,000
- *   BWP  120,001   –   156,000   : 8,700  + 18.75% on excess over 120,000
- *   BWP  156,001   –   ∞         : 15,450 + 25%    on excess over 156,000
- *
- * Verification examples (see unit tests too)
- * ------------------------------------------
- *   Citizen BWP  5,000 / month  =>  annual 60,000
- *     band 48k-84k: 5% × (60,000 − 48,000) = 600 / year => 50.00 / month
- *
- *   Citizen BWP 12,000 / month  =>  annual 144,000
- *     band 120k-156k: 6,300 + 18.75% × 24,000 = 10,800 / year => 900.00 / month
- *
- *   Citizen BWP 20,000 / month  =>  annual 240,000
- *     band 156k+:    13,050 + 25%    × 84,000 = 34,050 / year => 2,837.50 / month
- *
- *   Non-citizen BWP 12,000 / month  =>  annual 144,000
- *     band 120k-156k: 8,700 + 18.75% × 24,000 = 13,200 / year => 1,100.00 / month
- *
- * @author  Botsfirm PaySphere
+ * AUDIT TRAIL:
+ * To update for a new tax year:
+ * 1. Add new year key to TAX_TABLES
+ * 2. Update CURRENT_TAX_YEAR constant
+ * 3. No other changes required
  */
 
 'use strict';
 
-// ---------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------
+// ─── Tax Tables ───────────────────────────────────────────────────────────────
+// Only rates and boundaries. No base values — these are derived, not stored.
+// Source: BURS Income Tax Act, Schedule 1 (2025/2026)
 
-/**
- * Annual PAYE brackets for residents and citizens of Botswana.
- *
- * Each entry describes the band [floor, ceiling] in BWP, the marginal
- * rate that applies *within* the band, and the cumulative tax already
- * owed at `floor` (so `baseTax` is the amount owed once you reach
- * exactly `floor` BWP of taxable income).
- *
- * @type {{ floor: number, ceiling: number, rate: number, baseTax: number }[]}
- */
-const RESIDENT_BRACKETS = [
-    { min: 0, max: 48000, base: 0, rate: 0 },
-      { min: 48000, max: 84000, base: 0, rate: 0.05 },
-      { min: 84000, max: 120000, base: 1800, rate: 0.125 },
-      { min: 120000, max: 156000, base: 6300, rate: 0.1875 },
-      { min: 156000, max: Infinity, base: 13050, rate: 0.25 },
+const TAX_TABLES = {
+  "2026": {
+    resident: [
+      { min: 0,      max: 48000,    rate: 0      }, // Tax-free threshold
+      { min: 48000,  max: 84000,    rate: 0.05   }, // 5%
+      { min: 84000,  max: 120000,   rate: 0.125  }, // 12.5%
+      { min: 120000, max: 156000,   rate: 0.1875 }, // 18.75%
+      { min: 156000, max: Infinity, rate: 0.25   }, // 25%
     ],
+    non_resident: [
+      { min: 0,      max: 84000,    rate: 0.05   }, // 5% from first pula
+      { min: 84000,  max: 120000,   rate: 0.125  }, // 12.5%
+      { min: 120000, max: 156000,   rate: 0.1875 }, // 18.75%
+      { min: 156000, max: Infinity, rate: 0.25   }, // 25%
+    ],
+  },
+};
+
+const CURRENT_TAX_YEAR = "2026";
+const MINIMUM_WAGE_HOURLY = 9.06;       // BWP per hour (effective January 2026)
+const STANDARD_HOURS_PER_MONTH = 174;   // 40hr week × 4.35 weeks
+const SDL_RATE = 0.002;                 // 0.2% of annual turnover
+const SDL_THRESHOLD_ANNUAL = 1000000;   // BWP 1,000,000
+const VALID_NATIONALITY_STATUSES = ['citizen', 'resident_non_citizen', 'non_resident'];
+
+const validateBrackets = (brackets, year, tableKey) => {
+  if (!brackets || brackets.length === 0) {
+    throw new Error(`Tax table is empty for year "${year}" / "${tableKey}"`);
+  }
+
+  const sorted = [...brackets].sort((a, b) => a.min - b.min);
+
+  if (sorted[0].min !== 0) {
+    throw new Error(
+      `First bracket must start at min: 0. Got: ${sorted[0].min} ` +
+      `in "${year}/${tableKey}"`
+    );
+  }
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].min !== sorted[i - 1].max) {
+      throw new Error(
+        `Bracket ${i - 1} max (${sorted[i - 1].max}) does not equal ` +
+        `bracket ${i} min (${sorted[i].min}) in "${year}/${tableKey}". ` +
+        `Gap or overlap detected.`
+      );
+    }
+  }
+
+  if (sorted[sorted.length - 1].max !== Infinity) {
+    throw new Error(
+      `Last bracket max must be Infinity. ` +
+      `Got: ${sorted[sorted.length - 1].max} in "${year}/${tableKey}"`
+    );
+  }
+
+  for (const bracket of sorted) {
+    if (typeof bracket.rate !== 'number' || bracket.rate < 0 || bracket.rate > 1) {
+      throw new Error(
+        `Invalid rate ${bracket.rate} at bracket min: ${bracket.min} ` +
+        `in "${year}/${tableKey}". Rate must be between 0 and 1.`
+      );
+    }
+  }
+
+  return sorted;
+};
+
+
+// ─── Core Tax Engine ──────────────────────────────────────────────────────────
 
 /**
- * Annual PAYE brackets for non-residents.
- * @type {{ floor: number, ceiling: number, rate: number, baseTax: number }[]}
+ * Calculate annual PAYE using explicit cumulative bracket iteration.
+ *
+ * ALGORITHM:
+ * For each bracket, calculate tax on the portion of income that falls
+ * within that bracket only. Accumulate across all brackets.
+ * No base values. No hidden dependencies.
+ *
+ * VERIFICATION (non-resident, BWP 180,000/year):
+ *   Band 0–84,000:    84,000 × 0.05   = 4,200
+ *   Band 84–120,000:  36,000 × 0.125  = 4,500
+ *   Band 120–156,000: 36,000 × 0.1875 = 6,750
+ *   Band 156–180,000: 24,000 × 0.25   = 6,000
+ *   Total annual tax  = 21,450
+ *   Monthly PAYE      = 1,787.50
+ *
+ * @param {number} annualIncome - Annual taxable income (BWP)
+ * @param {string} nationalityStatus - citizen | resident_non_citizen | non_resident
+ * @param {string} taxYear - Tax year key (default: CURRENT_TAX_YEAR)
+ * @returns {number} Annual PAYE rounded to 2 decimal places
+ * @throws {Error} If tax table not found or income is invalid
  */
-const NON_RESIDENT_BRACKETS = [
-    { min: 0, max: 84000, base: 0, rate: 0.05 },
-      { min: 84000, max: 120000, base: 4200, rate: 0.125 },
-      { min: 120000, max: 156000, base: 8700, rate: 0.1875 },
-      { min: 156000, max: Infinity, base: 15450, rate: 0.25 },
+const calculateAnnualTax = (annualIncome, nationalityStatus, taxYear = CURRENT_TAX_YEAR) => {
+  // Input validation
+  if (typeof annualIncome !== 'number' || isNaN(annualIncome)) {
+    throw new Error(`Invalid annualIncome: ${annualIncome}. Must be a number.`);
+  }
+  if (annualIncome < 0) {
+    throw new Error(`Annual income cannot be negative: ${annualIncome}`);
+  }
+  if (annualIncome === 0) return 0;
+
+  if (!nationalityStatus) {
+    throw new Error('nationalityStatus is required');
+  }
+
+  // Resolve table key
+  const tableKey = (
+    nationalityStatus === 'citizen' ||
+    nationalityStatus === 'resident_non_citizen'
+  ) ? 'resident' : 'non_resident';
+
+  const brackets = TAX_TABLES[taxYear]?.[tableKey];
+  if (!brackets || brackets.length === 0) {
+    throw new Error(`Tax table not found for year "${taxYear}" and status "${nationalityStatus}"`);
+  }
+
+  // Safety: ensure brackets are sorted ascending by min
+  // This prevents silent errors if table order is accidentally changed
+  const sorted = [...brackets].sort((a, b) => a.min - b.min);
+
+  let annualTax = 0;
+
+  for (const bracket of sorted) {
+    // No income in this bracket — stop iterating
+    if (annualIncome <= bracket.min) break;
+
+    // Income that falls within this bracket only
+    const incomeInBracket = Math.min(annualIncome, bracket.max) - bracket.min;
+
+    // Tax from this bracket only — accumulate, never overwrite
+    annualTax += incomeInBracket * bracket.rate;
+  }
+
+  return Number(annualTax.toFixed(2));
+};
+
+/**
+ * Calculate monthly PAYE.
+ * Method: annualise → apply brackets → divide by 12.
+ * This is the BURS-prescribed method for monthly PAYE withholding.
+ *
+ * @param {number} monthlyTaxableIncome - Monthly taxable income (BWP)
+ * @param {string} nationalityStatus
+ * @returns {number} Monthly PAYE rounded to 2 decimal places
+ */
+const calculateMonthlyTax = (monthlyTaxableIncome, nationalityStatus) => {
+  if (typeof monthlyTaxableIncome !== 'number' || isNaN(monthlyTaxableIncome)) {
+    throw new Error(`Invalid monthlyTaxableIncome: ${monthlyTaxableIncome}`);
+  }
+  if (monthlyTaxableIncome < 0) {
+    throw new Error(`Monthly income cannot be negative: ${monthlyTaxableIncome}`);
+  }
+  if (monthlyTaxableIncome === 0) return 0;
+
+  const annualIncome = monthlyTaxableIncome * 12;
+  const annualTax = calculateAnnualTax(annualIncome, nationalityStatus);
+  return Number((annualTax / 12).toFixed(2));
+};
+
+/**
+ * Get effective tax rate as a percentage.
+ *
+ * @param {number} monthlyTaxableIncome
+ * @param {string} nationalityStatus
+ * @returns {number} Effective rate as percentage (e.g. 12.50)
+ */
+const getEffectiveTaxRate = (monthlyTaxableIncome, nationalityStatus) => {
+  if (!monthlyTaxableIncome || monthlyTaxableIncome <= 0) return 0;
+  const paye = calculateMonthlyTax(monthlyTaxableIncome, nationalityStatus);
+  return Number(((paye / monthlyTaxableIncome) * 100).toFixed(2));
+};
+
+/**
+ * Validate salary against Botswana minimum wage.
+ *
+ * @param {number} monthlySalary - Monthly salary (BWP)
+ * @param {number} hoursPerMonth - Hours per month (default 174)
+ * @returns {{ valid, minimumMonthly, message }}
+ */
+const validateMinimumWage = (monthlySalary, hoursPerMonth = STANDARD_HOURS_PER_MONTH) => {
+  const minimumMonthly = Number((MINIMUM_WAGE_HOURLY * hoursPerMonth).toFixed(2));
+  const valid = monthlySalary >= minimumMonthly;
+  return {
+    valid,
+    minimumMonthly,
+    hourlyRate: MINIMUM_WAGE_HOURLY,
+    message: valid
+      ? `Salary BWP ${monthlySalary} meets minimum wage of BWP ${minimumMonthly}/month`
+      : `Salary BWP ${monthlySalary} is below minimum wage of BWP ${minimumMonthly}/month`,
+  };
+};
+
+/**
+ * Calculate Skills Development Levy.
+ * Applicable to companies with annual turnover above BWP 1,000,000.
+ *
+ * @param {number} annualTurnover - Company annual turnover (BWP)
+ * @returns {number} Monthly SDL amount
+ */
+const calculateSDL = (annualTurnover) => {
+  if (!annualTurnover || annualTurnover < SDL_THRESHOLD_ANNUAL) return 0;
+  return Number(((annualTurnover * SDL_RATE) / 12).toFixed(2));
+};
+
+// ─── Boundary Verification (self-documenting) ─────────────────────────────────
+// These are the expected cumulative tax values at each bracket boundary.
+// Used for unit testing and audit verification.
+
+const RESIDENT_BOUNDARY_CHECKS = [
+  { annualIncome: 48000,  expectedAnnualTax: 0        },
+  { annualIncome: 84000,  expectedAnnualTax: 1800     },
+  { annualIncome: 120000, expectedAnnualTax: 6300     },
+  { annualIncome: 156000, expectedAnnualTax: 13050    },
 ];
 
-/** Minimum wage in BWP per hour, effective January 2026. */
-const MINIMUM_HOURLY_WAGE_BWP = 9.06;
+const NON_RESIDENT_BOUNDARY_CHECKS = [
+  { annualIncome: 84000,  expectedAnnualTax: 4200     },
+  { annualIncome: 120000, expectedAnnualTax: 8700     },
+  { annualIncome: 156000, expectedAnnualTax: 15450    },
+  { annualIncome: 180000, expectedAnnualTax: 21450    },
+];
 
-/** SDL is levied on employers whose annual turnover exceeds BWP 1,000,000. */
-const SDL_TURNOVER_THRESHOLD_BWP = 1_000_000;
-
-/** SDL rate (0.2% of monthly gross payroll / turnover). */
-const SDL_RATE = 0.002;
-
-// ---------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------
-
-/**
- * Resolve the bracket table given a nationality status string.
- *
- * Citizens and resident non-citizens are taxed using the resident
- * table; only `non_resident` falls under the non-resident schedule.
- *
- * @param {('citizen'|'resident_non_citizen'|'non_resident'|'resident'|'non-resident')} nationalityStatus
- * @returns {{ floor: number, ceiling: number, rate: number, baseTax: number }[]}
- */
-function selectBrackets(nationalityStatus) {
-    const status = String(nationalityStatus || '').toLowerCase();
-    if (status === 'non_resident' || status === 'non-resident' || status === 'nonresident') {
-        return NON_RESIDENT_BRACKETS;
+// Validate all tax tables on module load
+// Any misconfiguration throws immediately when server starts
+const validateAllTables = () => {
+  for (const year of Object.keys(TAX_TABLES)) {
+    for (const tableKey of Object.keys(TAX_TABLES[year])) {
+      validateBrackets(TAX_TABLES[year][tableKey], year, tableKey);
     }
-    // citizen, resident_non_citizen, resident — all use the resident table.
-    return RESIDENT_BRACKETS;
-}
+  }
+};
 
-/**
- * Round a monetary BWP amount to two decimal places, half-away-from-zero.
- * @param {number} amount
- * @returns {number}
- */
-function round2(amount) {
-    if (!Number.isFinite(amount)) return 0;
-    // Add a small epsilon-equivalent via Math.sign to avoid bias on .5 cases.
-    return Math.round((amount + Number.EPSILON) * 100) / 100;
-}
-
-/**
- * Validate that a numeric input is finite and non-negative.
- * @param {*} value
- * @param {string} label
- * @returns {number}
- */
-function assertNonNegativeNumber(value, label) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) {
-        throw new TypeError(`${label} must be a finite, non-negative number (received: ${value})`);
-    }
-    return n;
-}
-
-// ---------------------------------------------------------------------
-// Core calculations
-// ---------------------------------------------------------------------
-
-/**
- * Compute annual PAYE on a given annual taxable income.
- *
- * Walks the appropriate bracket table once. If `annualSalary` is zero
- * or negative it returns 0.
- *
- * @param {number} annualSalary - Annual taxable income in BWP.
- * @param {string} nationalityStatus - 'citizen' | 'resident_non_citizen' | 'non_resident'.
- * @returns {number} Annual PAYE in BWP, rounded to 2 decimals.
- *
- * @example
- *   calculateAnnualPAYE(60000,  'citizen');      //  600.00
- *   calculateAnnualPAYE(144000, 'citizen');      // 10800.00
- *   calculateAnnualPAYE(240000, 'citizen');      // 34050.00
- *   calculateAnnualPAYE(144000, 'non_resident'); // 13200.00
- */
-function calculateAnnualPAYE(annualSalary, nationalityStatus) {
-    const income = assertNonNegativeNumber(annualSalary, 'annualSalary');
-    if (income === 0) return 0;
-
-    const brackets = selectBrackets(nationalityStatus);
-
-    // Locate the band that contains `income`.
-    for (const band of brackets) {
-        if (income > band.floor && income <= band.ceiling) {
-            const tax = band.baseTax + (income - band.floor) * band.rate;
-            return round2(tax);
-        }
-    }
-
-    // Fallback: income exceeds the top ceiling (shouldn't happen — top is ∞).
-    const top = brackets[brackets.length - 1];
-    return round2(top.baseTax + (income - top.floor) * top.rate);
-}
-
-/**
- * Compute monthly PAYE from a monthly salary, using the annualisation method.
- *
- * Steps:
- *   1. annual = monthlySalary × 12
- *   2. annualTax = calculateAnnualPAYE(annual, nationalityStatus)
- *   3. monthlyPAYE = annualTax / 12
- *
- * @param {number} monthlySalary - Monthly taxable income (basic + taxable allowances − taxable deductions).
- * @param {string} nationalityStatus - 'citizen' | 'resident_non_citizen' | 'non_resident'.
- * @returns {number} Monthly PAYE in BWP, rounded to 2 decimals.
- *
- * @example
- *   calculateMonthlyPAYE( 5000, 'citizen');         //   50.00
- *   calculateMonthlyPAYE(12000, 'citizen');         //  900.00
- *   calculateMonthlyPAYE(20000, 'citizen');         // 2837.50
- *   calculateMonthlyPAYE(12000, 'non_resident');    // 1100.00
- */
-function calculateMonthlyPAYE(monthlySalary, nationalityStatus) {
-    const monthly = assertNonNegativeNumber(monthlySalary, 'monthlySalary');
-    const annual = monthly * 12;
-    const annualTax = calculateAnnualPAYE(annual, nationalityStatus);
-    return round2(annualTax / 12);
-}
-
-/**
- * Return the *effective* tax rate (annual PAYE ÷ annual income) for a
- * given monthly salary, expressed as a percentage (not a fraction).
- *
- * Returns 0 for zero income to avoid divide-by-zero.
- *
- * @param {number} monthlySalary - Monthly taxable income in BWP.
- * @param {string} nationalityStatus
- * @returns {number} Effective rate as a percentage, e.g. 7.5 means 7.5%.
- *
- * @example
- *   getEffectiveTaxRate(20000, 'citizen'); // ≈ 14.19 (i.e. 14.19%)
- */
-function getEffectiveTaxRate(monthlySalary, nationalityStatus) {
-    const monthly = assertNonNegativeNumber(monthlySalary, 'monthlySalary');
-    if (monthly === 0) return 0;
-    const annual = monthly * 12;
-    const annualTax = calculateAnnualPAYE(annual, nationalityStatus);
-    return round2((annualTax / annual) * 100);
-}
-
-// ---------------------------------------------------------------------
-// Compliance helpers
-// ---------------------------------------------------------------------
-
-/**
- * Verify a given hourly rate meets the Botswana statutory minimum wage.
- *
- * The general minimum wage is BWP 9.06 per hour effective January 2026.
- * Sectoral minimums (e.g. domestic, agriculture) may differ — handle
- * those at the sector layer; this function enforces the general floor.
- *
- * @param {number} hourlyRate - Hourly rate in BWP.
- * @returns {{ compliant: boolean, hourlyRate: number, minimumRequired: number, shortfall: number }}
- *
- * @example
- *   validateMinimumWage(10);   // { compliant: true,  ... }
- *   validateMinimumWage(8);    // { compliant: false, shortfall: 1.06 }
- */
-function validateMinimumWage(hourlyRate) {
-    const rate = assertNonNegativeNumber(hourlyRate, 'hourlyRate');
-    const compliant = rate >= MINIMUM_HOURLY_WAGE_BWP;
-    return {
-        compliant,
-        hourlyRate: round2(rate),
-        minimumRequired: MINIMUM_HOURLY_WAGE_BWP,
-        shortfall: compliant ? 0 : round2(MINIMUM_HOURLY_WAGE_BWP - rate)
-    };
-}
-
-/**
- * Compute monthly Skills Development Levy (SDL) for an employer.
- *
- * Botswana levies SDL at 0.2% of monthly turnover (or gross payroll,
- * depending on how the employer is assessed) for businesses whose
- * annual turnover exceeds BWP 1,000,000. Employers below the threshold
- * are exempt.
- *
- * The caller passes in the *monthly* turnover figure; we infer
- * eligibility by annualising (× 12) and comparing against the
- * threshold.
- *
- * @param {number} monthlyTurnover - Monthly turnover or gross payroll in BWP.
- * @returns {number} SDL payable for the month, in BWP (rounded to 2dp).
- *
- * @example
- *   calculateSDL(50000);   // annualised 600,000 (below threshold) => 0
- *   calculateSDL(100000);  // annualised 1,200,000 => 100000 * 0.002 = 200.00
- */
-function calculateSDL(monthlyTurnover) {
-    const monthly = assertNonNegativeNumber(monthlyTurnover, 'monthlyTurnover');
-    const annualised = monthly * 12;
-    if (annualised <= SDL_TURNOVER_THRESHOLD_BWP) return 0;
-    return round2(monthly * SDL_RATE);
-}
-
-// ---------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------
+validateAllTables();
+// ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
-    // primary functions
-    calculateMonthlyPAYE,
-    calculateAnnualPAYE,
-    getEffectiveTaxRate,
-    validateMinimumWage,
-    calculateSDL,
-
-    // constants — exposed for testing and for downstream display
-    RESIDENT_BRACKETS,
-    NON_RESIDENT_BRACKETS,
-    MINIMUM_HOURLY_WAGE_BWP,
-    SDL_TURNOVER_THRESHOLD_BWP,
-    SDL_RATE
+  calculateAnnualTax,
+  calculateMonthlyTax,
+  getEffectiveTaxRate,
+  validateMinimumWage,
+  calculateSDL,
+  validateBrackets,
+  TAX_TABLES,
+  CURRENT_TAX_YEAR,
+  MINIMUM_WAGE_HOURLY,
+  STANDARD_HOURS_PER_MONTH,
+  RESIDENT_BOUNDARY_CHECKS,
+  NON_RESIDENT_BOUNDARY_CHECKS,
 };

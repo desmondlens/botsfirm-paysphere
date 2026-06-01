@@ -32,6 +32,14 @@ import AllowancesPage from './pages/admin/AllowancesPage';
 import DeductionsPage from './pages/admin/DeductionsPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import EmployeeLayout from './pages/employee/EmployeeLayout';
+import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
+import EmployeePayslipPage from './pages/employee/EmployeePayslipPage';
+import EmployeeLeavePage from './pages/employee/EmployeeLeavePage';
+import EmployeeProfilePage from './pages/employee/EmployeeProfilePage';
+
+
+
 
 
 function ComingSoon({ title }) {
@@ -189,13 +197,20 @@ function AppRoutes() {
   <Route path="settings" element={<AdminSettingsPage />} />
 </Route>
       <Route
-        path="/employee/*"
-        element={
-          <ProtectedRoute roles={['employee']}>
-            <ComingSoon title="Employee Portal" />
-          </ProtectedRoute>
-        }
-      />
+  path="/employee"
+  element={
+    <ProtectedRoute roles={['employee']}>
+      <EmployeeLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route path="dashboard" element={<EmployeeDashboardPage />} />
+  <Route path="set-password" element={<EmployeeSetPasswordPage />} />
+  <Route path="payslip" element={<EmployeePayslipPage />} />
+  <Route path="leave" element={<EmployeeLeavePage />} />
+  <Route path="profile" element={<EmployeeProfilePage />} />
+
+</Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
