@@ -79,6 +79,9 @@ const payrollRoutes = require('./routes/payroll.routes');
 const leaveRoutes = require('./routes/leave.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const trialRoutes = require('./routes/trial.routes');
+const downloadRoutes = require('./routes/download.routes');
+
+
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -89,6 +92,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/trial', trialRoutes);
+app.use('/api/download', downloadRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 

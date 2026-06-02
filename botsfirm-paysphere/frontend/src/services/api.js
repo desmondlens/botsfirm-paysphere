@@ -247,6 +247,25 @@ export const clientAPI = {
   }),
 };
 
+// ─── Downloads ────────────────────────────────────────────────────────────────
+
+export const downloadAPI = {
+  payslipPDF: (payslipId) => {
+    const token = sessionStorage.getItem('paysphere_token');
+    window.open(`${API_BASE_URL}/api/download/payslip/${payslipId}?token=${token}`, '_blank');
+  },
+
+  quickbooksExcel: (payrollRunId) => {
+    const token = sessionStorage.getItem('paysphere_token');
+    window.open(`${API_BASE_URL}/api/download/quickbooks/${payrollRunId}?token=${token}`, '_blank');
+  },
+
+  itw7Excel: (month, year) => {
+    const token = sessionStorage.getItem('paysphere_token');
+    window.open(`${API_BASE_URL}/api/download/itw7?month=${month}&year=${year}&token=${token}`, '_blank');
+  },
+};
+
 // ─── Employee ─────────────────────────────────────────────────────────────────
 
 export const employeeAPI = {
@@ -260,4 +279,5 @@ export const employeeAPI = {
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword }),
   }),
+  
 };
