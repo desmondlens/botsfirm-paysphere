@@ -10,9 +10,9 @@ import {
   ErrorBanner,
   authStyles as styles,
 } from './LoginPage';
-import { api } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
 import theme from '../../styles/theme';
-
+import { useAuth } from '../../context/AuthContext';
 const EMPLOYEE_BANDS = [
   { value: '1-10', label: '1 – 10 employees' },
   { value: '11-50', label: '11 – 50 employees' },

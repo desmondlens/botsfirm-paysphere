@@ -11,7 +11,7 @@ import {
   SuccessBanner,
   authStyles as styles,
 } from './LoginPage';
-import { api } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
 import theme from '../../styles/theme';
 
 export default function ResetPasswordPage() {

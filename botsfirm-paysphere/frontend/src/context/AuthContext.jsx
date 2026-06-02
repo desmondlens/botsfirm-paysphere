@@ -1,166 +1,81 @@
-// AuthContext.jsx
-// Global authentication state for Botsfirm PaySphere.
-//
-// Design notes:
-//   - JWT is held in module-local memory (`tokenRef`). Never localStorage.
-//   - Axios instance attaches the token via an interceptor.
-//   - On mount we call /api/auth/me to hydrate the user. If the token is
-//     missing or expired, the call 401s and the user stays logged out.
-//   - On 401 from any future request, we auto-logout.
-
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import axios from 'axios';
-
-const API_BASE_URL =
-  import.meta.env?.VITE_API_URL ||
-  import.meta.env?.REACT_APP_API_URL ||
-  'http://localhost:3002';
-
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  withCredentials: false,
-});
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setTokenState] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
-  const tokenRef = useRef(null);
 
-  const setToken = useCallback((next) => {
-    tokenRef.current = next;
-    setTokenState(next);
-  }, []);
-
-  // Attach Authorization on every request (read fresh ref each time).
+  // Check for existing session on load
   useEffect(() => {
-    const reqInterceptor = api.interceptors.request.use((config) => {
-      if (tokenRef.current) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${tokenRef.current}`;
+    const savedToken = sessionStorage.getItem('paysphere_token');
+    const savedUser = sessionStorage.getItem('paysphere_user');
+
+    if (savedToken && savedUser) {
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch {
+        sessionStorage.removeItem('paysphere_token');
+        sessionStorage.removeItem('paysphere_user');
       }
-      return config;
-    });
-
-    const resInterceptor = api.interceptors.response.use(
-      (r) => r,
-      (error) => {
-        const status = error?.response?.status;
-        const code = error?.response?.data?.code;
-        if (status === 401 && tokenRef.current) {
-          // Token rejected — clear state.
-          tokenRef.current = null;
-          setTokenState(null);
-          setUser(null);
-        }
-        if (code === 'TOKEN_EXPIRED' || code === 'SESSION_EXPIRED') {
-          tokenRef.current = null;
-          setTokenState(null);
-          setUser(null);
-        }
-        return Promise.reject(error);
-      },
-    );
-    return () => {
-      api.interceptors.request.eject(reqInterceptor);
-      api.interceptors.response.eject(resInterceptor);
-    };
-  }, []);
-
-  // Hydrate on first mount. Token is in memory only so the only way to be
-  // logged in across reloads is to log in again — by design.
-  useEffect(() => {
+    }
     setLoading(false);
   }, []);
 
-  const login = useCallback(
-    async (credentials) => {
-      const { data } = await api.post('/auth/login', credentials);
-      tokenRef.current = data.token;
-      setTokenState(data.token);
-      setUser(data.user);
-      return data;
-    },
-    [],
-  );
+  const login = async (credentials) => {
+    const data = await authAPI.login(credentials);
 
-  const logout = useCallback(async () => {
-    try {
-      if (tokenRef.current) {
-        await api.post('/auth/logout');
-      }
-    } catch {
-      // ignore — we're logging out client-side regardless
+    if (data.token && data.user) {
+      setToken(data.token);
+      setUser(data.user);
+      sessionStorage.setItem('paysphere_token', data.token);
+      sessionStorage.setItem('paysphere_user', JSON.stringify(data.user));
     }
-    tokenRef.current = null;
-    setTokenState(null);
+
+    return data;
+  };
+
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // Continue logout even if API call fails
+    }
+    setToken(null);
     setUser(null);
-  }, []);
+    sessionStorage.removeItem('paysphere_token');
+    sessionStorage.removeItem('paysphere_user');
+  };
 
-  const refreshUser = useCallback(async () => {
-    if (!tokenRef.current) return null;
-    try {
-      const { data } = await api.get('/auth/me');
-      setUser(data.user);
-      return data;
-    } catch {
-      return null;
-    }
-  }, []);
+  const isAuthenticated = !!token && !!user;
 
-  const hasRole = useCallback(
-    (role) => {
-      if (!user) return false;
-      if (Array.isArray(role)) return role.includes(user.role);
-      return user.role === role;
-    },
-    [user],
-  );
+  const hasRole = (role) => user?.role === role;
 
-  const hasTenant = useCallback(
-    (tenantId) => {
-      if (!user) return false;
-      return user.tenant_id === tenantId;
-    },
-    [user],
-  );
+  const hasTenant = (tenantId) => user?.tenant_id === tenantId;
 
-  const value = useMemo(
-    () => ({
+  return (
+    <AuthContext.Provider value={{
       user,
       token,
       loading,
-      isAuthenticated: !!user && !!token,
       login,
       logout,
-      refreshUser,
+      isAuthenticated,
       hasRole,
       hasTenant,
-      api,
-    }),
-    [user, token, loading, login, logout, refreshUser, hasRole, hasTenant],
+    }}>
+      {children}
+    </AuthContext.Provider>
   );
+};
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside an <AuthProvider>');
-  }
-  return ctx;
-}
-
-export { api };
 export default AuthContext;

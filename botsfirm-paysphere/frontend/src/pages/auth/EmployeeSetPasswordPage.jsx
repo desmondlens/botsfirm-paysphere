@@ -13,7 +13,9 @@ import {
   PasswordChecklist,
   usePasswordChecklist,
 } from './ResetPasswordPage';
-import { api, useAuth } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+
 
 export default function EmployeeSetPasswordPage() {
   const { user, refreshUser } = useAuth();

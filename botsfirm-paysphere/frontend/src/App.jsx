@@ -37,7 +37,7 @@ import EmployeeDashboardPage from './pages/employee/EmployeeDashboardPage';
 import EmployeePayslipPage from './pages/employee/EmployeePayslipPage';
 import EmployeeLeavePage from './pages/employee/EmployeeLeavePage';
 import EmployeeProfilePage from './pages/employee/EmployeeProfilePage';
-
+import ClientAuditLogsPage from './pages/client/ClientAuditLogsPage';
 
 
 
@@ -158,7 +158,7 @@ function AppRoutes() {
   <Route path="invite-codes" element={<InviteCodesPage />} />
   <Route path="audit-logs" element={<AuditLogsPage />} />
   <Route path="settings" element={<SettingsPage />} />
-
+  
 
 </Route>     
       <Route
@@ -175,6 +175,7 @@ function AppRoutes() {
   <Route path="settings" element={<ClientSettingsPage />} />
   <Route path="payroll" element={<PayrollOverviewPage />} />
   <Route path="compliance" element={<CompliancePage />} />
+  <Route path="audit-logs" element={<ClientAuditLogsPage />} />
 </Route>
 
       

@@ -11,9 +11,9 @@ import {
   ErrorBanner,
   authStyles as styles,
 } from './LoginPage';
-import { api, useAuth } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
 import theme from '../../styles/theme';
-
+import { useAuth } from '../../context/AuthContext';
 const PLAN_LABELS = {
   starter: 'Starter',
   growth: 'Growth',

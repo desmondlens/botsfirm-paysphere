@@ -4,9 +4,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FiEye, FiEyeOff, FiAlertCircle } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { authAPI } from '../../services/api';
 import theme from '../../styles/theme';
-
+import { useAuth } from '../../context/AuthContext';
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
